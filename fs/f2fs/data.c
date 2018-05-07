@@ -2511,7 +2511,7 @@ fail:
 	f2fs_put_page(page, 1);
 	f2fs_write_failed(mapping, pos + len);
 	if (drop_atomic)
-		f2fs_drop_inmem_pages_all(sbi);
+		f2fs_drop_inmem_pages_all(sbi, false);
 	return err;
 }
 
