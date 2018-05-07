@@ -177,7 +177,7 @@ bool f2fs_need_SSR(struct f2fs_sb_info *sbi)
 
 	if (test_opt(sbi, LFS))
 		return false;
-	if (sbi->gc_thread && sbi->gc_thread->gc_urgent)
+	if (sbi->gc_mode == GC_URGENT)
 		return true;
 	if (unlikely(is_sbi_flag_set(sbi, SBI_CP_DISABLED)))
 		return true;
@@ -1547,7 +1547,7 @@ static int issue_discard_thread(void *data)
 		if (dcc->discard_wake)
 			dcc->discard_wake = 0;
 
-		if (sbi->gc_thread && sbi->gc_thread->gc_urgent)
+		if (sbi->gc_mode == GC_URGENT)
 			__init_discard_policy(sbi, &dpolicy, DPOLICY_FORCE, 1);
 
 		sb_start_intwrite(sbi->sb);
