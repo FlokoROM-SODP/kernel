@@ -114,7 +114,7 @@ next:
 	return 0;
 }
 
-int start_gc_thread(struct f2fs_sb_info *sbi)
+int f2fs_start_gc_thread(struct f2fs_sb_info *sbi)
 {
 	struct f2fs_gc_kthread *gc_th;
 	dev_t dev = sbi->sb->s_bdev->bd_dev;
@@ -148,7 +148,7 @@ out:
 	return err;
 }
 
-void stop_gc_thread(struct f2fs_sb_info *sbi)
+void f2fs_stop_gc_thread(struct f2fs_sb_info *sbi)
 {
 	struct f2fs_gc_kthread *gc_th = sbi->gc_thread;
 	if (!gc_th)
@@ -439,7 +439,7 @@ static void add_gc_inode(struct gc_inode_list *gc_list, struct inode *inode)
 		iput(inode);
 		return;
 	}
-	new_ie = f2fs_kmem_cache_alloc(inode_entry_slab, GFP_NOFS);
+	new_ie = f2fs_kmem_cache_alloc(f2fs_inode_entry_slab, GFP_NOFS);
 	new_ie->inode = inode;
 
 	f2fs_radix_tree_insert(&gc_list->iroot, inode->i_ino, new_ie);
@@ -453,7 +453,7 @@ static void put_gc_inode(struct gc_inode_list *gc_list)
 		radix_tree_delete(&gc_list->iroot, ie->inode->i_ino);
 		iput(ie->inode);
 		list_del(&ie->list);
-		kmem_cache_free(inode_entry_slab, ie);
+		kmem_cache_free(f2fs_inode_entry_slab, ie);
 	}
 }
 
@@ -504,28 +504,28 @@ next_step:
 			continue;
 
 		if (phase == 0) {
-			ra_meta_pages(sbi, NAT_BLOCK_OFFSET(nid), 1,
+			f2fs_ra_meta_pages(sbi, NAT_BLOCK_OFFSET(nid), 1,
 							META_NAT, true);
 			continue;
 		}
 
 		if (phase == 1) {
-			ra_node_page(sbi, nid);
+			f2fs_ra_node_page(sbi, nid);
 			continue;
 		}
 
 		/* phase == 2 */
-		node_page = get_node_page(sbi, nid);
+		node_page = f2fs_get_node_page(sbi, nid);
 		if (IS_ERR(node_page))
 			continue;
 
-		/* block may become invalid during get_node_page */
+		/* block may become invalid during f2fs_get_node_page */
 		if (check_valid_map(sbi, segno, off) == 0) {
 			f2fs_put_page(node_page, 1);
 			continue;
 		}
 
-		if (get_node_info(sbi, nid, &ni)) {
+		if (f2fs_get_node_info(sbi, nid, &ni)) {
 			f2fs_put_page(node_page, 1);
 			continue;
 		}
@@ -535,7 +535,7 @@ next_step:
 			continue;
 		}
 
-		err = move_node_page(node_page, gc_type);
+		err = f2fs_move_node_page(node_page, gc_type);
 		if (!err && gc_type == FG_GC)
 			submitted++;
 		stat_inc_node_blk_count(sbi, 1, gc_type);
@@ -553,7 +553,7 @@ next_step:
  * as indirect or double indirect node blocks, are given, it must be a caller's
  * bug.
  */
-block_t start_bidx_of_node(unsigned int node_ofs, struct inode *inode)
+block_t f2fs_start_bidx_of_node(unsigned int node_ofs, struct inode *inode)
 {
 	unsigned int indirect_blks = 2 * NIDS_PER_BLOCK + 4;
 	unsigned int bidx;
@@ -584,11 +584,11 @@ static bool is_alive(struct f2fs_sb_info *sbi, struct f2fs_summary *sum,
 	nid = le32_to_cpu(sum->nid);
 	ofs_in_node = le16_to_cpu(sum->ofs_in_node);
 
-	node_page = get_node_page(sbi, nid);
+	node_page = f2fs_get_node_page(sbi, nid);
 	if (IS_ERR(node_page))
 		return false;
 
-	if (get_node_info(sbi, nid, dni)) {
+	if (f2fs_get_node_info(sbi, nid, dni)) {
 		f2fs_put_page(node_page, 1);
 		return false;
 	}
@@ -657,7 +657,7 @@ static int move_data_block(struct inode *inode, block_t bidx,
 	}
 
 	set_new_dnode(&dn, inode, NULL, NULL, 0);
-	err = get_dnode_of_data(&dn, bidx, LOOKUP_NODE);
+	err = f2fs_get_dnode_of_data(&dn, bidx, LOOKUP_NODE);
 	if (err)
 		goto out;
 
@@ -673,10 +673,9 @@ static int move_data_block(struct inode *inode, block_t bidx,
 	 */
 	f2fs_wait_on_page_writeback(page, DATA, true);
 
-	err = get_node_info(fio.sbi, dn.nid, &ni);
+	err = f2fs_get_node_info(fio.sbi, dn.nid, &ni);
 	if (err)
 		goto put_out;
-
 
 	set_summary(&sum, dn.nid, dn.ofs_in_node, ni.version);
 
@@ -687,7 +686,7 @@ static int move_data_block(struct inode *inode, block_t bidx,
 	if (lfs_mode)
 		down_write(&fio.sbi->io_order_lock);
 
-	allocate_data_block(fio.sbi, NULL, fio.old_blkaddr, &newaddr,
+	f2fs_allocate_data_block(fio.sbi, NULL, fio.old_blkaddr, &newaddr,
 					&sum, CURSEG_COLD_DATA, NULL, false);
 
 	fio.encrypted_page = f2fs_pagecache_get_page(META_MAPPING(fio.sbi),
@@ -746,7 +745,7 @@ recover_block:
 	if (lfs_mode)
 		up_write(&fio.sbi->io_order_lock);
 	if (err)
-		__f2fs_replace_block(fio.sbi, &sum, newaddr, fio.old_blkaddr,
+		f2fs_do_replace_block(fio.sbi, &sum, newaddr, fio.old_blkaddr,
 								true, true);
 put_out:
 	f2fs_put_dnode(&dn);
@@ -761,7 +760,7 @@ static int move_data_page(struct inode *inode, block_t bidx, int gc_type,
 	struct page *page;
 	int err = 0;
 
-	page = get_lock_data_page(inode, bidx, true);
+	page = f2fs_get_lock_data_page(inode, bidx, true);
 	if (IS_ERR(page))
 		return PTR_ERR(page);
 
@@ -809,12 +808,12 @@ retry:
 		f2fs_wait_on_page_writeback(page, DATA, true);
 		if (clear_page_dirty_for_io(page)) {
 			inode_dec_dirty_pages(inode);
-			remove_dirty_inode(inode);
+			f2fs_remove_dirty_inode(inode);
 		}
 
 		set_cold_data(page);
 
-		err = do_write_data_page(&fio);
+		err = f2fs_do_write_data_page(&fio);
 		if (err) {
 			clear_cold_data(page);
 			if (err == -ENOMEM) {
@@ -868,13 +867,13 @@ next_step:
 			continue;
 
 		if (phase == 0) {
-			ra_meta_pages(sbi, NAT_BLOCK_OFFSET(nid), 1,
+			f2fs_ra_meta_pages(sbi, NAT_BLOCK_OFFSET(nid), 1,
 							META_NAT, true);
 			continue;
 		}
 
 		if (phase == 1) {
-			ra_node_page(sbi, nid);
+			f2fs_ra_node_page(sbi, nid);
 			continue;
 		}
 
@@ -883,7 +882,7 @@ next_step:
 			continue;
 
 		if (phase == 2) {
-			ra_node_page(sbi, dni.ino);
+			f2fs_ra_node_page(sbi, dni.ino);
 			continue;
 		}
 
@@ -906,8 +905,8 @@ next_step:
 				continue;
 			}
 
-			start_bidx = start_bidx_of_node(nofs, inode);
-			data_page = get_read_data_page(inode,
+			start_bidx = f2fs_start_bidx_of_node(nofs, inode);
+			data_page = f2fs_get_read_data_page(inode,
 					start_bidx + ofs_in_node, REQ_RAHEAD,
 					true);
 			up_write(&F2FS_I(inode)->i_gc_rwsem[WRITE]);
@@ -942,7 +941,7 @@ next_step:
 				inode_dio_wait(inode);
 			}
 
-			start_bidx = start_bidx_of_node(nofs, inode)
+			start_bidx = f2fs_start_bidx_of_node(nofs, inode)
 								+ ofs_in_node;
 			if (f2fs_post_read_required(inode))
 				err = move_data_block(inode, start_bidx, segno, off);
@@ -998,12 +997,12 @@ static int do_garbage_collect(struct f2fs_sb_info *sbi,
 
 	/* readahead multi ssa blocks those have contiguous address */
 	if (sbi->segs_per_sec > 1)
-		ra_meta_pages(sbi, GET_SUM_BLOCK(sbi, segno),
+		f2fs_ra_meta_pages(sbi, GET_SUM_BLOCK(sbi, segno),
 					sbi->segs_per_sec, META_SSA, true);
 
 	/* reference all summary page */
 	while (segno < end_segno) {
-		sum_page = get_sum_page(sbi, segno++);
+		sum_page = f2fs_get_sum_page(sbi, segno++);
 		if (IS_ERR(sum_page)) {
 			int err = PTR_ERR(sum_page);
 
@@ -1117,7 +1116,7 @@ gc_more:
 		 * secure free segments which doesn't need fggc any more.
 		 */
 		if (prefree_segments(sbi)) {
-			ret = write_checkpoint(sbi, &cpc);
+			ret = f2fs_write_checkpoint(sbi, &cpc);
 			if (ret)
 				goto stop;
 		}
@@ -1150,7 +1149,7 @@ gc_more:
 		}
 
 		if (gc_type == FG_GC)
-			ret = write_checkpoint(sbi, &cpc);
+			ret = f2fs_write_checkpoint(sbi, &cpc);
 	}
 stop:
 	SIT_I(sbi)->last_victim[ALLOC_NEXT] = 0;
@@ -1174,7 +1173,7 @@ stop:
 	return ret;
 }
 
-void build_gc_manager(struct f2fs_sb_info *sbi)
+void f2fs_build_gc_manager(struct f2fs_sb_info *sbi)
 {
 	u64 main_count, resv_count, ovp_count;
 

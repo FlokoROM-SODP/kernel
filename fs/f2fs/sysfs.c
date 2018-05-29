@@ -205,13 +205,13 @@ static ssize_t f2fs_sbi_store(struct f2fs_attr *a,
 
 		down_write(&sbi->sb_lock);
 
-		ret = update_extension_list(sbi, name, hot, set);
+		ret = f2fs_update_extension_list(sbi, name, hot, set);
 		if (ret)
 			goto out;
 
 		ret = f2fs_commit_super(sbi, false);
 		if (ret)
-			update_extension_list(sbi, name, hot, !set);
+			f2fs_update_extension_list(sbi, name, hot, !set);
 out:
 		up_write(&sbi->sb_lock);
 		return ret ? ret : count;
