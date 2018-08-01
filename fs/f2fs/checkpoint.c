@@ -88,8 +88,10 @@ repeat:
 
 	err = f2fs_submit_page_bio(&fio);
 	if (err) {
-		f2fs_put_page(page, 1);
-		return ERR_PTR(err);
+		memset(page_address(page), 0, PAGE_SIZE);
+		f2fs_stop_checkpoint(sbi, false);
+		f2fs_bug_on(sbi, 1);
+		return page;
 	}
 
 	lock_page(page);
