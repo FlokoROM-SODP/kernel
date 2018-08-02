@@ -1175,7 +1175,7 @@ static void unblock_operations(struct f2fs_sb_info *sbi)
 	f2fs_unlock_all(sbi);
 }
 
-static void wait_on_all_pages_writeback(struct f2fs_sb_info *sbi)
+void f2fs_wait_on_all_pages_writeback(struct f2fs_sb_info *sbi)
 {
 	DEFINE_WAIT(wait);
 
@@ -1404,7 +1404,7 @@ static int do_checkpoint(struct f2fs_sb_info *sbi, struct cp_control *cpc)
 	f2fs_sync_meta_pages(sbi, META, LONG_MAX, FS_CP_META_IO);
 
 	/* wait for previous submitted meta pages writeback */
-	wait_on_all_pages_writeback(sbi);
+	f2fs_wait_on_all_pages_writeback(sbi);
 
 	if (unlikely(f2fs_cp_error(sbi)))
 		return -EIO;
@@ -1416,9 +1416,11 @@ static int do_checkpoint(struct f2fs_sb_info *sbi, struct cp_control *cpc)
 
 	/* barrier and flush checkpoint cp pack 2 page if it can */
 	commit_checkpoint(sbi, ckpt, start_blk);
-	wait_on_all_pages_writeback(sbi);
+	f2fs_wait_on_all_pages_writeback(sbi);
 
 	f2fs_release_ino_entry(sbi, false);
+
+	f2fs_reset_fsync_node_info(sbi);
 
 	if (unlikely(f2fs_cp_error(sbi)))
 		return -EIO;
