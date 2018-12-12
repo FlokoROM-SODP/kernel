@@ -1291,7 +1291,7 @@ static unsigned ext4_max_namelen(struct inode *inode)
 
 static inline bool ext4_is_encrypted(struct inode *inode)
 {
-	return ext4_encrypted_inode(inode);
+	return IS_ENCRYPTED(inode);
 }
 
 static const struct fscrypt_operations ext4_cryptops = {
