@@ -235,7 +235,9 @@ static struct dentry *ubifs_lookup(struct inode *dir, struct dentry *dentry,
 			return ERR_PTR(err);
 	}
 
-	err = fscrypt_setup_filename(dir, &dentry->d_name, 1, &nm);
+	err = fscrypt_prepare_lookup(dir, dentry, &nm);
+	if (err == -ENOENT)
+		return d_splice_alias(NULL, dentry);
 	if (err)
 		return ERR_PTR(err);
 
