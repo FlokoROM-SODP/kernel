@@ -156,10 +156,9 @@ static int determine_cipher_type(struct fscrypt_info *ci, struct inode *inode,
 	u32 mode;
 
 	if (!fscrypt_valid_enc_modes(ci->ci_data_mode, ci->ci_filename_mode)) {
-		fscrypt_warn(inode->i_sb,
-			     "inode %lu uses unsupported encryption modes (contents mode %d, filenames mode %d)",
-			     inode->i_ino, ci->ci_data_mode,
-			     ci->ci_filename_mode);
+		fscrypt_warn(inode,
+			     "Unsupported encryption modes (contents mode %d, filenames mode %d)",
+			     ci->ci_data_mode, ci->ci_filename_mode);
 		return -EINVAL;
 	}
 
@@ -170,8 +169,8 @@ static int determine_cipher_type(struct fscrypt_info *ci, struct inode *inode,
 		ci->ci_mode = CI_FNAME_MODE;
 		mode = ci->ci_filename_mode;
 	} else {
-		WARN_ONCE(1, "fscrypt: filesystem tried to load encryption info for inode %lu, which is not encryptable (file type %d)\n",
-			  inode->i_ino, (inode->i_mode & S_IFMT));
+		fscrypt_warn(inode,
+			     "Direct key mode not allowed with different contents and filenames modes");
 		return -EINVAL;
 	}
 
@@ -355,7 +354,7 @@ int fscrypt_get_encryption_info(struct inode *inode)
 	ctfm = crypto_alloc_skcipher(cipher_str, 0, 0);
 	if (IS_ERR(ctfm)) {
 		res = PTR_ERR(ctfm);
-		fscrypt_warn(inode->i_sb,
+		fscrypt_warn(inode,
 			     "error allocating '%s' transform for inode %lu: %d",
 			     cipher_str, inode->i_ino, res);
 		goto out;
@@ -375,7 +374,7 @@ int fscrypt_get_encryption_info(struct inode *inode)
 		res = init_essiv_generator(crypt_info, crypt_info->ci_raw_key,
 						keysize);
 		if (res) {
-			fscrypt_warn(inode->i_sb,
+			fscrypt_warn(inode,
 				     "error initializing ESSIV generator for inode %lu: %d",
 				     inode->i_ino, res);
 			goto out;
