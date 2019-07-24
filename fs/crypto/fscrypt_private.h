@@ -142,6 +142,13 @@ extern bool fscrypt_fname_encrypted_size(const struct inode *inode,
 					 u32 *encrypted_len_ret);
 
 /* keyinfo.c */
-extern void __exit fscrypt_essiv_cleanup(void);
+struct fscrypt_mode {
+	const char *friendly_name;
+	const char *cipher_str;
+	int keysize;
+	int ivsize;
+	bool logged_impl_name;
+	bool needs_essiv;
+};
 
 #endif /* _FSCRYPT_PRIVATE_H */

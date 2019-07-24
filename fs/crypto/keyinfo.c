@@ -254,11 +254,6 @@ out:
 	return err;
 }
 
-void __exit fscrypt_essiv_cleanup(void)
-{
-	crypto_free_shash(essiv_hash_tfm);
-}
-
 static int fscrypt_data_encryption_mode(struct inode *inode)
 {
 	return fscrypt_should_be_processed_by_ice(inode) ?
