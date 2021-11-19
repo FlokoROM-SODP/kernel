@@ -19,6 +19,7 @@
  */
 
 #include <linux/iversion.h>
+#include <linux/fscrypt.h>
 #include "sdcardfs.h"
 #include "linux/delay.h"
 

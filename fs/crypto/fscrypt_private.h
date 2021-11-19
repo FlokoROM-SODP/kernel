@@ -12,24 +12,13 @@
 #ifndef _FSCRYPT_PRIVATE_H
 #define _FSCRYPT_PRIVATE_H
 
-#ifndef __FS_HAS_ENCRYPTION
-#define __FS_HAS_ENCRYPTION 1
-#endif
 #include <linux/fscrypt.h>
 #include <crypto/hash.h>
 #include <linux/pfk.h>
 
 /* Encryption parameters */
 #define FS_IV_SIZE			16
-#define FS_AES_128_ECB_KEY_SIZE		16
-#define FS_AES_128_CBC_KEY_SIZE		16
-#define FS_AES_128_CTS_KEY_SIZE		16
-#define FS_AES_256_GCM_KEY_SIZE		32
-#define FS_AES_256_CBC_KEY_SIZE		32
-#define FS_AES_256_CTS_KEY_SIZE		32
-#define FS_AES_256_XTS_KEY_SIZE		64
-
-#define FS_KEY_DERIVATION_NONCE_SIZE		16
+#define FS_KEY_DERIVATION_NONCE_SIZE	16
 
 /**
  * Encryption context for inode
@@ -89,7 +78,6 @@ typedef enum {
 } fscrypt_direction_t;
 
 #define FS_CTX_REQUIRES_FREE_ENCRYPT_FL		0x00000001
-#define FS_CTX_HAS_BOUNCE_BUFFER_FL		0x00000002
 
 static inline bool fscrypt_valid_enc_modes(u32 contents_mode,
 					   u32 filenames_mode)
@@ -122,14 +110,21 @@ static inline bool is_private_data_mode(struct fscrypt_info *ci)
 /* crypto.c */
 extern struct kmem_cache *fscrypt_info_cachep;
 extern int fscrypt_initialize(unsigned int cop_flags);
-extern int fscrypt_do_page_crypto(const struct inode *inode,
-				  fscrypt_direction_t rw, u64 lblk_num,
-				  struct page *src_page,
-				  struct page *dest_page,
-				  unsigned int len, unsigned int offs,
-				  gfp_t gfp_flags);
-extern struct page *fscrypt_alloc_bounce_page(struct fscrypt_ctx *ctx,
-					      gfp_t gfp_flags);
+extern int fscrypt_crypt_block(const struct inode *inode,
+			       fscrypt_direction_t rw, u64 lblk_num,
+			       struct page *src_page, struct page *dest_page,
+			       unsigned int len, unsigned int offs,
+			       gfp_t gfp_flags);
+extern struct page *fscrypt_alloc_bounce_page(gfp_t gfp_flags);
+extern const struct dentry_operations fscrypt_d_ops;
+
+extern void __printf(3, 4) __cold
+fscrypt_msg(const struct inode *inode, const char *level, const char *fmt, ...);
+
+#define fscrypt_warn(inode, fmt, ...)		\
+	fscrypt_msg((inode), KERN_WARNING, fmt, ##__VA_ARGS__)
+#define fscrypt_err(inode, fmt, ...)		\
+	fscrypt_msg((inode), KERN_ERR, fmt, ##__VA_ARGS__)
 
 /* fname.c */
 extern int fname_encrypt(struct inode *inode, const struct qstr *iname,
@@ -139,6 +134,13 @@ extern bool fscrypt_fname_encrypted_size(const struct inode *inode,
 					 u32 *encrypted_len_ret);
 
 /* keyinfo.c */
-extern void __exit fscrypt_essiv_cleanup(void);
+struct fscrypt_mode {
+	const char *friendly_name;
+	const char *cipher_str;
+	int keysize;
+	int ivsize;
+	bool logged_impl_name;
+	bool needs_essiv;
+};
 
 #endif /* _FSCRYPT_PRIVATE_H */
